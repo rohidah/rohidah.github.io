@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <link href='https://fonts.googleapis.com/css?family=Architects+Daughter' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/github-light.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print">
+
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+
+    <title>Rohidah.GitHub.io by rohidah</title>
+  </head>
+
+  <body>
+    <header>
+      <div class="inner">
+        <h1>Rohidah.GitHub.io</h1>
+        <h2>Assignment 1 Writeup</h2>
+        <a href="https://github.com/rohidah" class="button"><small>Follow me on</small> GitHub</a>
+      </div>
+    </header>
+
+    <div id="content-wrapper">
+      <div class="inner clearfix">
+        <section id="main-content">
+          <hr>
+
+<p>title: "Practical Learning Machine Assignment"
+author: "Rohidah Maskuri"
+date: "November 20, 2015"</p>
+
+<h2>
+<a id="output-html_document" class="anchor" href="#output-html_document" aria-hidden="true"><span class="octicon octicon-link"></span></a>output: html_document</h2>
+
+<h2>
+<a id="executive-summary" class="anchor" href="#executive-summary" aria-hidden="true"><span class="octicon octicon-link"></span></a>Executive Summary</h2>
+
+<p>In this project, our goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. It will then predict the manner in which they did the exercise. This is the "classe" variable in the training set. This report will describe how we built our model, how we used cross validation, what we think the expected out of sample error is, and why we made the choices you did. We will also use our prediction model to predict 20 different test cases.</p>
+
+<h2>
+<a id="splitting-the-data" class="anchor" href="#splitting-the-data" aria-hidden="true"><span class="octicon octicon-link"></span></a>Splitting the Data</h2>
+
+<p>Since the data already been splitted into the testing set and training set, both the files are loaded separately. As we can see, there are 19622 rows and 160 columns of data available form the training data set and 20 rows and 160 columns of testing data set.</p>
+
+<div class="highlight highlight-source-r"><pre>setwd(<span class="pl-s"><span class="pl-pds">"</span>C:/Users/rohidah/Google Drive/3  Data Science/Practical-Machine-Learning<span class="pl-pds">"</span></span>)
+<span class="pl-smi">testingori</span> <span class="pl-k">&lt;-</span> read.csv(<span class="pl-s"><span class="pl-pds">"</span>pml-testing.csv<span class="pl-pds">"</span></span>, <span class="pl-v">na.strings</span><span class="pl-k">=</span>c(<span class="pl-s"><span class="pl-pds">"</span>NA<span class="pl-pds">"</span></span>,<span class="pl-s"><span class="pl-pds">"</span><span class="pl-pds">"</span></span>), <span class="pl-v">strip.white</span><span class="pl-k">=</span><span class="pl-c1">T</span>)
+<span class="pl-smi">training</span> <span class="pl-k">&lt;-</span> read.csv(<span class="pl-s"><span class="pl-pds">"</span>pml-training.csv<span class="pl-pds">"</span></span>, <span class="pl-v">na.strings</span><span class="pl-k">=</span>c(<span class="pl-s"><span class="pl-pds">"</span>NA<span class="pl-pds">"</span></span>,<span class="pl-s"><span class="pl-pds">"</span><span class="pl-pds">"</span></span>), <span class="pl-v">strip.white</span><span class="pl-k">=</span><span class="pl-c1">T</span>)
+dim(<span class="pl-smi">training</span>)
+dim(<span class="pl-smi">testingori</span>)
+</pre></div>
+
+<h2>
+<a id="trimming-the-variables" class="anchor" href="#trimming-the-variables" aria-hidden="true"><span class="octicon octicon-link"></span></a>Trimming the variables</h2>
+
+<p>Within the 160 variables, there are a lot of variables that will not contribute to the analysis. In this section, we are removing all those columns that contain "NA" and has no numeric value from the training data set. This leaves us with only 60 variables to review.</p>
+
+<div class="highlight highlight-source-r"><pre><span class="pl-smi">training2</span> <span class="pl-k">&lt;-</span> <span class="pl-smi">training</span>[ , colSums(is.na(<span class="pl-smi">training</span>)) <span class="pl-k">==</span> <span class="pl-c1">0</span>]
+dim(<span class="pl-smi">training2</span>)</pre></div>
+
+<p>When we review the variables, the first 7 variables are information that are not significant for our analysis. Thus we are removing those 7 non-relevant variables. This process will reduce the variables further to 53 variables with the last variable being classe, the variable that we are predicting.</p>
+
+<div class="highlight highlight-source-r"><pre><span class="pl-smi">training3</span><span class="pl-k">&lt;-</span><span class="pl-smi">training2</span>[,<span class="pl-k">-</span>c(<span class="pl-c1">1</span><span class="pl-k">:</span><span class="pl-c1">7</span>)]
+dim(<span class="pl-smi">training3</span>)
+</pre></div>
+
+<p>The last step in preparing the baseline training data is to look at the correlations between the variables in our dataset. We may want to remove highly correlated predictors from our analysis and replace them with weighted combinations of predictors. This may allow a more complete capture of the information available.</p>
+
+<div class="highlight highlight-source-r"><pre>library(<span class="pl-smi">corrplot</span>)
+<span class="pl-smi">corrmatrix</span><span class="pl-k">&lt;-</span> cor(na.omit(<span class="pl-smi">training3</span>[sapply(<span class="pl-smi">training3</span>, <span class="pl-smi">is.numeric</span>)]))
+dim(<span class="pl-smi">corrmatrix</span>)
+corrplot(<span class="pl-smi">corrmatrix</span>, <span class="pl-v">order</span> <span class="pl-k">=</span> <span class="pl-s"><span class="pl-pds">"</span>FPC<span class="pl-pds">"</span></span>, <span class="pl-v">method</span> <span class="pl-k">=</span> <span class="pl-s"><span class="pl-pds">"</span>square<span class="pl-pds">"</span></span>, <span class="pl-v">type</span> <span class="pl-k">=</span> <span class="pl-s"><span class="pl-pds">"</span>upper<span class="pl-pds">"</span></span>, <span class="pl-v">tl.cex</span> <span class="pl-k">=</span> <span class="pl-c1">0.8</span>, <span class="pl-v">tl.col</span> <span class="pl-k">=</span> rgb(<span class="pl-c1">0</span>, <span class="pl-c1">0</span>, <span class="pl-c1">0</span>))</pre></div>
+
+<h1>
+<a id="plotting-the-correlation" class="anchor" href="#plotting-the-correlation" aria-hidden="true"><span class="octicon octicon-link"></span></a>Plotting the correlation</h1>
+
+<div class="highlight highlight-source-r"><pre>library(<span class="pl-smi">caret</span>)</pre></div>
+
+<p>This grid shows the correlation between pairs of the predictors in our dataset. From a high-level perspective darker blue and darker red squares indicate high positive and high negative correlations, respectively. Those that are highly correlated will be be removed with a a cutoff determined at 90%.Removing the highly correlated variable (90% and above)</p>
+
+<div class="highlight highlight-source-r"><pre>
+<span class="pl-v">removecor</span> <span class="pl-k">=</span> findCorrelation(<span class="pl-smi">corrmatrix</span>, <span class="pl-v">cutoff</span> <span class="pl-k">=</span> .<span class="pl-c1">99</span>, <span class="pl-v">verbose</span> <span class="pl-k">=</span> <span class="pl-c1">TRUE</span>)
+<span class="pl-v">training5</span> <span class="pl-k">=</span> <span class="pl-smi">training3</span>[,<span class="pl-k">-</span><span class="pl-smi">removecor</span>]
+dim(<span class="pl-smi">training5</span>)</pre></div>
+
+<p>We now split the updated training dataset into a training dataset (70% of the observations) and a validation dataset (30% of the observations). This validation dataset will allow us to perform cross validation when designing our model.```</p>
+
+<h2>
+<a id="cross-validation---splitting-data-to-test-and-train" class="anchor" href="#cross-validation---splitting-data-to-test-and-train" aria-hidden="true"><span class="octicon octicon-link"></span></a>Cross Validation - Splitting data to test and train</h2>
+
+<div class="highlight highlight-source-r"><pre><span class="pl-smi">inTrain</span> <span class="pl-k">&lt;-</span> createDataPartition(<span class="pl-v">y</span><span class="pl-k">=</span><span class="pl-smi">training5</span><span class="pl-k">$</span><span class="pl-smi">classe</span>, <span class="pl-v">p</span><span class="pl-k">=</span><span class="pl-c1">0.7</span>, <span class="pl-v">list</span><span class="pl-k">=</span><span class="pl-c1">FALSE</span>)
+<span class="pl-smi">training</span> <span class="pl-k">&lt;-</span> <span class="pl-smi">training5</span>[<span class="pl-smi">inTrain</span>,] 
+<span class="pl-smi">testing</span> <span class="pl-k">&lt;-</span> <span class="pl-smi">training5</span>[<span class="pl-k">-</span><span class="pl-smi">inTrain</span>,]
+dim(<span class="pl-smi">training</span>);dim(<span class="pl-smi">testing</span>)
+
+</pre></div>
+
+<h2>
+<a id="random-forest-model--cross-validation-testing" class="anchor" href="#random-forest-model--cross-validation-testing" aria-hidden="true"><span class="octicon octicon-link"></span></a>Random Forest Model &amp; Cross Validation Testing</h2>
+
+<p>Next, we train a model using a random forest approach on the smaller training dataset. </p>
+
+<div class="highlight highlight-source-r"><pre>library(<span class="pl-smi">randomForest</span>)
+<span class="pl-smi">modFitB1</span> <span class="pl-k">&lt;-</span> randomForest(<span class="pl-smi">classe</span> <span class="pl-k">~</span>. , <span class="pl-v">data</span><span class="pl-k">=</span><span class="pl-smi">training</span>)
+<span class="pl-smi">predictionsB1</span> <span class="pl-k">&lt;-</span> predict(<span class="pl-smi">modFitB1</span>, <span class="pl-smi">testing</span>, <span class="pl-v">type</span> <span class="pl-k">=</span> <span class="pl-s"><span class="pl-pds">"</span>class<span class="pl-pds">"</span></span>)
+confusionMatrix(<span class="pl-smi">testing</span><span class="pl-k">$</span><span class="pl-smi">classe</span>,<span class="pl-smi">predictionsB1</span>)</pre></div>
+
+<h2>
+<a id="accuracy-and-out-of-sample-error-estimate" class="anchor" href="#accuracy-and-out-of-sample-error-estimate" aria-hidden="true"><span class="octicon octicon-link"></span></a>Accuracy and Out-of-Sample Error Estimate</h2>
+
+<p>Random forest trees were generated for the training dataset using cross-validation. Then the generated algorithm was examnined under the partitioned training set to examine the accuracy and estimated error of prediction. By using 52 predictors for five classes using cross-validation  an accuracy of 0.9958 with a 95% CI [(0.9937, 0.9972)] was achieved accompanied by a Kappa value of 0.9946. Thus the The estimated accuracy of the model is 99.58% and the estimated out-of-sample error based on our fitted model applied to the cross validation dataset is 0.42%.</p>
+
+<h2>
+<a id="predicted-results" class="anchor" href="#predicted-results" aria-hidden="true"><span class="octicon octicon-link"></span></a>Predicted Results</h2>
+
+<p>Finally, we  We then run our model against the testing dataset and display the predicted results</p>
+
+<div class="highlight highlight-source-r"><pre><span class="pl-smi">testingori</span><span class="pl-k">&lt;-</span><span class="pl-smi">testingori</span>[,names(<span class="pl-smi">training</span>[,<span class="pl-k">-</span><span class="pl-c1">52</span>])]
+<span class="pl-smi">predictionsB2</span><span class="pl-k">&lt;-</span>predict(<span class="pl-smi">modFitB1</span>,<span class="pl-smi">testingori</span>, <span class="pl-v">type</span><span class="pl-k">=</span><span class="pl-s"><span class="pl-pds">"</span>class<span class="pl-pds">"</span></span>)
+<span class="pl-smi">predictionsB2</span></pre></div>
+        </section>
+
+        <aside id="sidebar">
+
+
+          <p>This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the Architect theme by <a href="https://twitter.com/jasonlong">Jason Long</a>.</p>
+        </aside>
+      </div>
+    </div>
+
+  
+  </body>
+</html>
